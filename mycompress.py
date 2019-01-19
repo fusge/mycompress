@@ -108,6 +108,7 @@ if __name__ == "__main__":
                         help='Minimum file size to consider (in bytes)')
     args = parser.parse_args()
     if args.directory and args.email:
-        main(args.directory, target_email=args.email,
-             threshold=args.threshold)
+        with daemon.DaemonContext():
+            main(args.directory, target_email=args.email,
+                 threshold=args.threshold)
 
