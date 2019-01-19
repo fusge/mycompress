@@ -12,13 +12,14 @@ import logging
 from email.message import EmailMessage
 
 # set basic logging configuration
-logging.basicConfig(level=logging.DEBUG, filename='compress_logger.log',
-                    filemode='w',
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s : %(message)s')
 
 def mailresults(results, to_addr):
-    msgtext = "Dear recipient,
-    The compression program has terminated. Below is a list of files that were compressed, as well as files that were skipped:"
+    msgtext = ("Dear recipient,\n \n"
+               "The compression program has terminated. Below is a list of \n"
+               "files that were compressed, as well as files that were"
+               "skipped:")
     msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n' 
                    + 'skipped:' + ',\n'.join(results['not_compressed_files'])
                    + '\n' 
