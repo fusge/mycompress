@@ -12,12 +12,22 @@ import logging
 from email.message import EmailMessage
 
 def mailresults(results, to_addr):
+    """ Emails results to given address using local host.
+    
+    This module takes output from the compressfiles function and formats the
+    data for email and then sends email to given address using local mail
+    server.
+    
+    args:
+        results (dict): dictionary from compressefiles function
+        to_addr (str): string detailing email address to send results to
+    """
     msgtext = ("Dear recipient,\n \n"
                "The compression program has terminated. Below is a list of \n"
-               "files that were compressed, as well as files that were"
+               "files that were compressed, as well as files that were "
                "skipped:\n")
     msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n \n' 
-                   + 'skipped:' + ',\n'.join(results['not_compressed_files'])
+                   + 'skipped:\n' + ',\n'.join(results['not_compressed_files'])
                    + '\n \n' 
                    + 'total space saved is {} percent'.format(results['saved_memory']))
 
@@ -32,7 +42,6 @@ def mailresults(results, to_addr):
     try:
         s = smtplib.SMTP('localhost')
         s.connect()
-        print('got here')
         s.send_message(msg, from_addr='', to_addrs=[to_addr])
         s.quit()
         logging.info('Email message sent to: %s', to_addr)
@@ -41,13 +50,32 @@ def mailresults(results, to_addr):
 
 
 def compressfiles(dir_name, thresh=0):
+    """ Compresses files inside a directory recursively.
+    
+    This function takes in a directory and threshold argument and compresses
+    all files within that directory recursively. Files that do not fulfill the
+    threshold requirement are skipped. Does not compress files that it believes
+    are already compressed.
+    
+    args:
+        dir_name (str): Name of the directory to point the function to
+        thresh (int): Minimum memory size to consider for compression (in
+            bytes)
+    
+    returns: 
+        dictionary with the following fields:
+            saved_memory: percentage of memory saved by compression
+            saved_bytes: Number of memory bytes saved by compression
+            compressed_files: list of files that were compressed
+            not_compressed_files: list of files skipped because of threshold or
+                already compressed.
+    """
     if not thresh:
         thresh = 0
     uncompressed_size = 0
     compressed_size = 0
     compressed_files = []
     not_compressed_files = []
-    logging.info('Begin compression')
     # direcotry loop and file loop
     for dirpath, _, filelist in os.walk(dir_name):
         if not filelist:
@@ -76,28 +104,40 @@ def compressfiles(dir_name, thresh=0):
                     compressed_size += zipobj.infolist()[0].compress_size
                     logging.info('%s : compressed', filepath)
                     compressed_files.append(filename)
-                    print(filepath)
                     os.remove(filepath)
                 except OSError as e: 
                     logging.warning('Compression failed with: '+e.strerror) 
 
     results = dict()
     results['saved_memory'] = (1 - (compressed_size/uncompressed_size))*100.0
+    results['saved_bytes'] = uncompressed_size - compressed_size
     results['compressed_files'] = compressed_files
     results['not_compressed_files'] = not_compressed_files
     return results
 
 
 def iscompressed(filepath):
+    """ Tests if the given file is already compressed. 
+    
+    args:
+        filepath (str): file name and location of file in question
+    
+    returns:
+        bool : True for compressed, False for not compressed"""
     return zipfile.is_zipfile(filepath)
 
 
 def main(directory_path, target_email='', threshold=0):    
+    """ Main program """
+    logging.info('Begin compression')
     result = compressfiles(directory_path, thresh=threshold)
+    logging.info('Compression completed')
     mailresults(result, to_addr=target_email)
+    logging.info('Ending compression program')
 
 
 if __name__ == "__main__":
+    # Parse arguments from command line
     parser = argparse.ArgumentParser(description='Compresses all files within a directory.')
     parser.add_argument('directory', metavar='D', type=str,
                         help='full or relative path to the directory for compression')
@@ -117,8 +157,11 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.WARNING,
                             format='%(asctime)s - %(levelname)s : %(message)s')
 
+    # run compresser as daemon service
     if args.directory and args.email:
-        #with daemon.DaemonContext():
-        main(args.directory, target_email=args.email,
-            threshold=args.threshold)
+        with daemon.DaemonContext():
+            main(args.directory, target_email=args.email,
+                 threshold=args.threshold)
+            
+
 
