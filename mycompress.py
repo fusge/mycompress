@@ -11,18 +11,14 @@ import smtplib
 import logging
 from email.message import EmailMessage
 
-# set basic logging configuration
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s : %(message)s')
-
 def mailresults(results, to_addr):
     msgtext = ("Dear recipient,\n \n"
                "The compression program has terminated. Below is a list of \n"
                "files that were compressed, as well as files that were"
-               "skipped:")
-    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n' 
+               "skipped:\n")
+    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n \n' 
                    + 'skipped:' + ',\n'.join(results['not_compressed_files'])
-                   + '\n' 
+                   + '\n \n' 
                    + 'total space saved is {} percent'.format(results['saved_memory']))
 
     msg = EmailMessage()
@@ -63,12 +59,14 @@ def compressfiles(dir_name, thresh=0):
             # only non-compressed and non-hidden files are considered
             if filename[0] == '.' or iscompressed(filepath):
                 logging.info('%s not compressed. File hidden or already compressed', filepath)
+                not_compressed_files.append(filename)
                 compressed_size += filesize
                 continue
             
             # filesize condition
             if filesize < thresh:
                 logging.warning('%s not compressed. Below the filesize threshold.', filepath)
+                not_compressed_files.append(filename)
                 compressed_size += filesize
                 continue
             else:
@@ -81,7 +79,7 @@ def compressfiles(dir_name, thresh=0):
                     print(filepath)
                     os.remove(filepath)
                 except OSError as e: 
-                    logging.error('Failed with: '+e.strerror) 
+                    logging.warning('Compression failed with: '+e.strerror) 
 
     results = dict()
     results['saved_memory'] = (1 - (compressed_size/uncompressed_size))*100.0
@@ -98,17 +96,29 @@ def main(directory_path, target_email='', threshold=0):
     result = compressfiles(directory_path, thresh=threshold)
     mailresults(result, to_addr=target_email)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Compresses all files within a directory.')
     parser.add_argument('directory', metavar='D', type=str,
                         help='full or relative path to the directory for compression')
     parser.add_argument('email', type=str,
-                        help='Email address to send results of compression to')
+                        help='Email address to send diagnostics of compression to')
     parser.add_argument('--threshold', type=int,
                         help='Minimum file size to consider (in bytes)')
+    parser.add_argument('-v', '--verbosity', action='store_true',
+                        help='increase verbosity of compression')
     args = parser.parse_args()
+    
+    # set basic logging configuration
+    if args.verbosity:
+        logging.basicConfig(level=logging.DEBUG,
+                            format='%(asctime)s - %(levelname)s : %(message)s')
+    else:
+        logging.basicConfig(level=logging.WARNING,
+                            format='%(asctime)s - %(levelname)s : %(message)s')
+
     if args.directory and args.email:
-        with daemon.DaemonContext():
-            main(args.directory, target_email=args.email,
-                 threshold=args.threshold)
+        #with daemon.DaemonContext():
+        main(args.directory, target_email=args.email,
+            threshold=args.threshold)
 
