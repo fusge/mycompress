@@ -3,6 +3,7 @@
 """ Program that compresses files in a given folder and logs actions. """
 
 import daemon
+import signal
 import zipfile
 import zlib
 import os
@@ -146,6 +147,11 @@ def main(directory_path, target_email='', threshold=0):
     logging.info('Ending compression program')
 
 
+def end_program(signum, frame):
+    """ Exits in case of OS signal """
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     # Parse arguments from command line
     parser = argparse.ArgumentParser(description='Compresses all files within a directory.')
@@ -171,7 +177,9 @@ if __name__ == "__main__":
     # run compresser as daemon service
     if args.directory and args.email:
         with daemon.DaemonContext(working_directory=os.getcwd(), 
-                                  stdout=sys.stdout, 
+                                  signal_map={signal.SIGTERM: end_program,
+                                              signal.SIGTSTP: end_program},
+                                  stdout=sys.stdout,
                                   stderr=sys.stderr):
             main(args.directory, target_email=args.email,
                 threshold=args.threshold)
