@@ -6,6 +6,7 @@ import daemon
 import zipfile
 import zlib
 import os
+import sys
 import argparse
 import smtplib
 import logging
@@ -169,9 +170,9 @@ if __name__ == "__main__":
     
     # run compresser as daemon service
     if args.directory and args.email:
-        with daemon.DaemonContext(working_directory=os.cwd(), 
+        with daemon.DaemonContext(working_directory=os.getcwd(), 
                                   stdout=sys.stdout, 
-                                  stderr=sys.sterr):
+                                  stderr=sys.stderr):
             main(args.directory, target_email=args.email,
                 threshold=args.threshold)
             
