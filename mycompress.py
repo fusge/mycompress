@@ -108,6 +108,7 @@ def compressfiles(dir_name, thresh=0):
                 except OSError as e: 
                     logging.warning('Compression failed with: '+e.strerror) 
 
+    # save output and return results
     results = dict()
     results['saved_memory'] = (1 - (compressed_size/uncompressed_size))*100.0
     results['saved_bytes'] = uncompressed_size - compressed_size
@@ -163,5 +164,4 @@ if __name__ == "__main__":
             main(args.directory, target_email=args.email,
                  threshold=args.threshold)
             
-
 
