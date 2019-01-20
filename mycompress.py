@@ -9,6 +9,7 @@ import os
 import argparse
 import smtplib
 import logging
+import lockfile
 from email.message import EmailMessage
 
 def mailresults(results, to_addr):
@@ -108,12 +109,18 @@ def compressfiles(dir_name, thresh=0):
                 except OSError as e: 
                     logging.warning('Compression failed with: '+e.strerror) 
 
-    # save output and return results
+    # save output and return results. Account for empty directory
     results = dict()
-    results['saved_memory'] = (1 - (compressed_size/uncompressed_size))*100.0
-    results['saved_bytes'] = uncompressed_size - compressed_size
+    if uncompressed_size == 0:
+        results['saved_memory'] = 0
+        results['saved_bytes'] = 0
+        logging.info('No files were found. Check that right path is given')
+    else:
+        results['saved_memory'] = (1 - (compressed_size/uncompressed_size))*100.0
+        results['saved_bytes'] = uncompressed_size - compressed_size
     results['compressed_files'] = compressed_files
     results['not_compressed_files'] = not_compressed_files
+
     return results
 
 
@@ -131,6 +138,7 @@ def iscompressed(filepath):
 def main(directory_path, target_email='', threshold=0):    
     """ Main program """
     logging.info('Begin compression')
+    logging.info(os.getcwd())
     result = compressfiles(directory_path, thresh=threshold)
     logging.info('Compression completed')
     mailresults(result, to_addr=target_email)
@@ -158,10 +166,13 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.WARNING,
                             format='%(asctime)s - %(levelname)s : %(message)s')
 
+    
     # run compresser as daemon service
     if args.directory and args.email:
-        with daemon.DaemonContext():
+        with daemon.DaemonContext(working_directory=os.cwd(), 
+                                  stdout=sys.stdout, 
+                                  stderr=sys.sterr):
             main(args.directory, target_email=args.email,
-                 threshold=args.threshold)
+                threshold=args.threshold)
             
 
