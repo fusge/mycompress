@@ -11,6 +11,7 @@ import sys
 import argparse
 import smtplib
 import logging
+from logging.handlers import SysLogHandler
 from email.message import EmailMessage
 
 def mailresults(results, to_addr):
@@ -99,7 +100,9 @@ def compressfiles(dir_name, thresh=0):
                 not_compressed_files.append(filename)
                 compressed_size += filesize
                 continue
-            elif not good_compression(filepath):
+            elif not (compression_ratio(filepath) < 0.95):
+                not_compressed_files.append(filename)
+                compressed_size += filesize
                 logging.warning('%s not compressed. will not produce good compression ratio.', filepath)
                 continue
             else:
@@ -144,18 +147,46 @@ def end_program(signum, frame):
     sys.exit(0)
 
 
-def good_compression(filepath):
+def compression_ratio(filepath):
+    """ estimates compression ratio for given file.
+    
+    This function reads a small portion of the input file (10KB) and estimates
+    the compression ratio expected from this file. 
+    
+    args:
+        filepath (str): file path to the file
+    
+    returns:
+        float : estimate percent of file size for compressed file
+    """
     compress_ratio = 0
     with open(filepath, 'rb') as fileobj:
         fileobj.seek(int(os.stat(filepath).st_size/2), 0)
         data = fileobj.read(100000)
         compressed_data = zlib.compress(data)
-        if sys.getsizeinfo(data) == 0:
+        if sys.getsizeof(data) == 0:
             compress_ratio = 1.0
         else:
-            compress_ratio = sys.getsizeinfo(compressed_data)/sys.getsizeinfo(data)
+            compress_ratio = sys.getsizeof(compressed_data)/sys.getsizeof(data)
 
-    return compress_ratio < 0.95
+    return compress_ratio
+
+
+def dry_run(dir_name):
+    file_bytes = 0
+    compressed_bytes = 0
+    for dir_path, _, filelist in os.walk(dir_name):
+        for filename in filelist:
+            filepath = os.path.join(dir_path, filename)
+            file_bytes += 1
+            compressed_bytes += compression_ratio(filepath)
+
+    if files_bytes == 0:
+        return None
+    else:
+        estimate = compressed_bytes/file_bytes
+
+    return estimate
 
 
 def main(directory_path, target_email='', threshold=0):    
@@ -184,20 +215,24 @@ if __name__ == "__main__":
     # set basic logging configuration
     if args.verbosity:
         logging.basicConfig(level=logging.DEBUG,
-                            stream=logging.handlers.SysLogHandler(facility='daemon')
                             format='%(asctime)s - %(levelname)s : %(message)s')
     else:
         logging.basicConfig(level=logging.WARNING,
-                            stream=logging.handlers.SysLogHandler(facility='daemon')
                             format='%(asctime)s - %(levelname)s : %(message)s')
-    
-    # run compresser as daemon service
+   
+
+    logging.getLogger().addHandler(SysLogHandler(address='/dev/log'))
+    #run compresser as daemon service
+
+    estimate = dry_run(args.directory)
+    print('Estimated memory savings is {} percent.
+          Continue?[y/n]'.format((1-estimate)*100)
     if args.directory and args.email:
         signalmap={signal.SIGTERM: end_program,
                    signal.SIGTSTP: end_program}
         with daemon.DaemonContext(working_directory=os.getcwd(), 
                                   signal_map=signalmap):
             main(args.directory, target_email=args.email,
-                threshold=args.threshold)
+                 threshold=args.threshold)
             
 
