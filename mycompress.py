@@ -145,6 +145,7 @@ def iscompressed(filepath):
 
 def end_program(signum, frame):
     """ Exits in case of OS signal """
+    logging.warning('Process Killed')
     sys.exit(0)
 
 
@@ -190,7 +191,11 @@ def dry_run(dir_name):
         for filename in filelist:
             filepath = os.path.join(dir_path, filename)
             file_bytes += 1
-            compressed_bytes += compression_ratio(filepath)
+            comp_ratio = compression_ratio(filepath)
+            if comp_ratio > 0.9:
+                compressed_bytes += 1
+            else:
+                compressed_bytes += comp_ratio
 
     if file_bytes == 0:
         est = 1
@@ -220,7 +225,8 @@ if __name__ == "__main__":
     parser.add_argument('--threshold', type=int,
                         help='Minimum file size to consider (in bytes)')
     parser.add_argument('-v', '--verbosity', action='store_true',
-                        help='increase verbosity of compression')
+                        help=('increase verbosity of logged actions. check '
+                              '/dev/log'))
     args = parser.parse_args()
 
     # set basic logging configuration
