@@ -224,15 +224,16 @@ if __name__ == "__main__":
     logging.getLogger().addHandler(SysLogHandler(address='/dev/log'))
     #run compresser as daemon service
 
-    estimate = dry_run(args.directory)
-    print('Estimated memory savings is {} percent.
-          Continue?[y/n]'.format((1-estimate)*100)
     if args.directory and args.email:
         signalmap={signal.SIGTERM: end_program,
                    signal.SIGTSTP: end_program}
-        with daemon.DaemonContext(working_directory=os.getcwd(), 
-                                  signal_map=signalmap):
-            main(args.directory, target_email=args.email,
-                 threshold=args.threshold)
+        estimate = dry_run(args.directory)
+        prompt = 'Estimated memory savings is {} percent. Continue?[y/n]'.format((1-estimate)*100
+        proceed = input(prompt)
+        if proceed == 'y':
+            with daemon.DaemonContext(working_directory=os.getcwd(), 
+                                      signal_map=signalmap):
+                main(args.directory, target_email=args.email,
+                    threshold=args.threshold)
             
 
