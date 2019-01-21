@@ -25,13 +25,13 @@ def mailresults(results, to_addr):
         results (dict): dictionary from compressefiles function
         to_addr (str): string detailing email address to send results to
     """
-    msgtext = ("Dear recipient,\n \n"
+    msgtext = ("Dear recipient,\n\n"
                "The compression program has terminated. Below is a list of \n"
                "files that were compressed, as well as files that were "
-               "skipped:\n Compressed:\n")
-    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n \n'
+               "skipped:\n\nCompressed:\n")
+    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n\n'
                    + 'skipped:\n' + ',\n'.join(results['not_compressed_files'])
-                   + '\n \n'
+                   + '\n\n'
                    + 'total space saved is {:.2f} percent'.format(results['saved_memory']))
 
     msg = EmailMessage()
@@ -183,7 +183,7 @@ def dry_run(dir_name):
     returns:
         float : percentage of compressed space relative to full file memory
     """
-    logging.info('Estimate compression program memory savings')
+    logging.debug('Estimate compression program memory savings')
     file_bytes = 0
     compressed_bytes = 0
     for dir_path, _, filelist in os.walk(dir_name):
