@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """ Program that compresses files in a given folder and logs actions. """
 
-import daemon
 import signal
 import zipfile
 import zlib
@@ -11,16 +10,17 @@ import sys
 import argparse
 import smtplib
 import logging
+import daemon
 from logging.handlers import SysLogHandler
 from email.message import EmailMessage
 
 def mailresults(results, to_addr):
     """ Emails results to given address using local host.
-    
+
     This module takes output from the compressfiles function and formats the
     data for email and then sends email to given address using local mail
     server.
-    
+
     args:
         results (dict): dictionary from compressefiles function
         to_addr (str): string detailing email address to send results to
@@ -28,25 +28,25 @@ def mailresults(results, to_addr):
     msgtext = ("Dear recipient,\n \n"
                "The compression program has terminated. Below is a list of \n"
                "files that were compressed, as well as files that were "
-               "skipped:\n")
-    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n \n' 
+               "skipped:\n Compressed:\n")
+    msg_content = (msgtext + ',\n'.join(results['compressed_files']) + '\n \n'
                    + 'skipped:\n' + ',\n'.join(results['not_compressed_files'])
-                   + '\n \n' 
-                   + 'total space saved is {} percent'.format(results['saved_memory']))
+                   + '\n \n'
+                   + 'total space saved is {:.2f} percent'.format(results['saved_memory']))
 
     msg = EmailMessage()
     msg.set_content(msg_content)
 
     msg['Subject'] = 'Compression program results'
-    msg['From'] = 'localhost' 
+    msg['From'] = 'localhost'
     msg['To'] = to_addr
 
     # Send the message using local SMTP server.
     try:
-        s = smtplib.SMTP('localhost')
-        s.connect()
-        s.send_message(msg, from_addr='', to_addrs=[to_addr])
-        s.quit()
+        smtpobj = smtplib.SMTP('localhost')
+        smtpobj.connect()
+        smtpobj.send_message(msg, from_addr='', to_addrs=[to_addr])
+        smtpobj.quit()
         logging.info('Email message sent to: %s', to_addr)
     except:
         logging.error('Unable to send email message')
@@ -54,18 +54,18 @@ def mailresults(results, to_addr):
 
 def compressfiles(dir_name, thresh=0):
     """ Compresses files inside a directory recursively.
-    
+
     This function takes in a directory and threshold argument and compresses
     all files within that directory recursively. Files that do not fulfill the
     threshold requirement are skipped. Does not compress files that it believes
     are already compressed.
-    
+
     args:
         dir_name (str): Name of the directory to point the function to
         thresh (int): Minimum memory size to consider for compression (in
             bytes)
-    
-    returns: 
+
+    returns:
         dictionary with the following fields:
             saved_memory: percentage of memory saved by compression
             saved_bytes: Number of memory bytes saved by compression
@@ -93,17 +93,18 @@ def compressfiles(dir_name, thresh=0):
                 not_compressed_files.append(filename)
                 compressed_size += filesize
                 continue
-            
+
             # filesize and good compression conditions
             if filesize < thresh:
                 logging.warning('%s not compressed. Below the filesize threshold.', filepath)
                 not_compressed_files.append(filename)
                 compressed_size += filesize
                 continue
-            elif not (compression_ratio(filepath) < 0.95):
+            elif not compression_ratio(filepath) < 0.95:
                 not_compressed_files.append(filename)
                 compressed_size += filesize
-                logging.warning('%s not compressed. will not produce good compression ratio.', filepath)
+                logging.warning('%s not compressed. will not produce good '
+                                'compression ratio.', filepath)
                 continue
             else:
                 zipobj = zipfile.ZipFile(filepath+'.zip', 'w')
@@ -113,8 +114,8 @@ def compressfiles(dir_name, thresh=0):
                     logging.info('%s : compressed', filepath)
                     compressed_files.append(filename)
                     os.remove(filepath)
-                except OSError as e: 
-                    logging.warning('Compression failed with: '+e.strerror) 
+                except OSError as err:
+                    logging.warning('Compression failed with: %s', err.strerror)
 
     # save output and return results. Account for empty directory
     results = dict()
@@ -132,11 +133,11 @@ def compressfiles(dir_name, thresh=0):
 
 
 def iscompressed(filepath):
-    """ Tests if the given file is already compressed. 
-    
+    """ Tests if the given file is already compressed.
+
     args:
         filepath (str): file name and location of file in question
-    
+
     returns:
         bool : True for compressed, False for not compressed"""
     return zipfile.is_zipfile(filepath)
@@ -149,13 +150,13 @@ def end_program(signum, frame):
 
 def compression_ratio(filepath):
     """ estimates compression ratio for given file.
-    
+
     This function reads a small portion of the input file (10KB) and estimates
-    the compression ratio expected from this file. 
-    
+    the compression ratio expected from this file.
+
     args:
         filepath (str): file path to the file
-    
+
     returns:
         float : estimate percent of file size for compressed file
     """
@@ -173,6 +174,16 @@ def compression_ratio(filepath):
 
 
 def dry_run(dir_name):
+    """ Estimates the amount of space that will be saved with compression
+    program.
+
+    args:
+        dir_name (str): path to directory for estimate
+
+    returns:
+        float : percentage of compressed space relative to full file memory
+    """
+    logging.info('Estimate compression program memory savings')
     file_bytes = 0
     compressed_bytes = 0
     for dir_path, _, filelist in os.walk(dir_name):
@@ -181,15 +192,15 @@ def dry_run(dir_name):
             file_bytes += 1
             compressed_bytes += compression_ratio(filepath)
 
-    if files_bytes == 0:
-        return None
+    if file_bytes == 0:
+        est = 1
     else:
-        estimate = compressed_bytes/file_bytes
+        est = compressed_bytes/file_bytes
 
-    return estimate
+    return est
 
 
-def main(directory_path, target_email='', threshold=0):    
+def main(directory_path, target_email='', threshold=0):
     """ Main program """
     logging.info('Begin compression')
     logging.info(os.getcwd())
@@ -211,7 +222,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--verbosity', action='store_true',
                         help='increase verbosity of compression')
     args = parser.parse_args()
-    
+
     # set basic logging configuration
     if args.verbosity:
         logging.basicConfig(level=logging.DEBUG,
@@ -219,21 +230,20 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.WARNING,
                             format='%(asctime)s - %(levelname)s : %(message)s')
-   
 
+    # make sure logging is sent to /var/log/messages using local logger
     logging.getLogger().addHandler(SysLogHandler(address='/dev/log'))
-    #run compresser as daemon service
 
+    #run compresser as daemon service
     if args.directory and args.email:
-        signalmap={signal.SIGTERM: end_program,
-                   signal.SIGTSTP: end_program}
+        signalmap = {signal.SIGTERM: end_program,
+                     signal.SIGTSTP: end_program}
         estimate = dry_run(args.directory)
-        prompt = 'Estimated memory savings is {} percent. Continue?[y/n]'.format((1-estimate)*100
+        prompt = ('Estimated memory savings is {} percent.'
+                  'Continue?[y/n]'.format((1-estimate)*100))
         proceed = input(prompt)
         if proceed == 'y':
-            with daemon.DaemonContext(working_directory=os.getcwd(), 
+            with daemon.DaemonContext(working_directory=os.getcwd(),
                                       signal_map=signalmap):
                 main(args.directory, target_email=args.email,
-                    threshold=args.threshold)
-            
-
+                     threshold=args.threshold)
