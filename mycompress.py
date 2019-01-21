@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Program that compresses files in a given folder and logs actions. """
+"""Program that compresses files in a given folder and logs actions. 
+
+The program takes in a directory path and an email address. Compreses all files
+within the directory and subdirectories, and sends an email message to the
+given email with diagonstic results. For furhter information use -h or --help
+option on the command line.
+"""
 
 import signal
 import zipfile
@@ -145,7 +151,7 @@ def iscompressed(filepath):
 
 def end_program(signum, frame):
     """ Exits in case of OS signal """
-    logging.warning('Process Killed')
+    logging.warning('Process killed with signal %s', signum)
     sys.exit(0)
 
 
