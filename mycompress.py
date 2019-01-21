@@ -11,7 +11,6 @@ import sys
 import argparse
 import smtplib
 import logging
-import lockfile
 from email.message import EmailMessage
 
 def mailresults(results, to_addr):
@@ -94,11 +93,14 @@ def compressfiles(dir_name, thresh=0):
                 compressed_size += filesize
                 continue
             
-            # filesize condition
+            # filesize and good compression conditions
             if filesize < thresh:
                 logging.warning('%s not compressed. Below the filesize threshold.', filepath)
                 not_compressed_files.append(filename)
                 compressed_size += filesize
+                continue
+            elif not good_compression(filepath):
+                logging.warning('%s not compressed. will not produce good compression ratio.', filepath)
                 continue
             else:
                 zipobj = zipfile.ZipFile(filepath+'.zip', 'w')
@@ -137,6 +139,25 @@ def iscompressed(filepath):
     return zipfile.is_zipfile(filepath)
 
 
+def end_program(signum, frame):
+    """ Exits in case of OS signal """
+    sys.exit(0)
+
+
+def good_compression(filepath):
+    compress_ratio = 0
+    with open(filepath, 'rb') as fileobj:
+        fileobj.seek(int(os.stat(filepath).st_size/2), 0)
+        data = fileobj.read(100000)
+        compressed_data = zlib.compress(data)
+        if sys.getsizeinfo(data) == 0:
+            compress_ratio = 1.0
+        else:
+            compress_ratio = sys.getsizeinfo(compressed_data)/sys.getsizeinfo(data)
+
+    return compress_ratio < 0.95
+
+
 def main(directory_path, target_email='', threshold=0):    
     """ Main program """
     logging.info('Begin compression')
@@ -145,11 +166,6 @@ def main(directory_path, target_email='', threshold=0):
     logging.info('Compression completed')
     mailresults(result, to_addr=target_email)
     logging.info('Ending compression program')
-
-
-def end_program(signum, frame):
-    """ Exits in case of OS signal """
-    sys.exit(0)
 
 
 if __name__ == "__main__":
@@ -168,19 +184,19 @@ if __name__ == "__main__":
     # set basic logging configuration
     if args.verbosity:
         logging.basicConfig(level=logging.DEBUG,
+                            stream=logging.handlers.SysLogHandler(facility='daemon')
                             format='%(asctime)s - %(levelname)s : %(message)s')
     else:
         logging.basicConfig(level=logging.WARNING,
+                            stream=logging.handlers.SysLogHandler(facility='daemon')
                             format='%(asctime)s - %(levelname)s : %(message)s')
-
     
     # run compresser as daemon service
     if args.directory and args.email:
+        signalmap={signal.SIGTERM: end_program,
+                   signal.SIGTSTP: end_program}
         with daemon.DaemonContext(working_directory=os.getcwd(), 
-                                  signal_map={signal.SIGTERM: end_program,
-                                              signal.SIGTSTP: end_program},
-                                  stdout=sys.stdout,
-                                  stderr=sys.stderr):
+                                  signal_map=signalmap):
             main(args.directory, target_email=args.email,
                 threshold=args.threshold)
             
