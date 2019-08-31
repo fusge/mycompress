@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     # set basic logging configuration
     if args.verbosity:
-        logging.basicConfig(level=logging.DEBUG,
+        logging.basicConfig(level=logging.INFO,
                             format='%(asctime)s - %(levelname)s : %(message)s')
     else:
         logging.basicConfig(level=logging.WARNING,
