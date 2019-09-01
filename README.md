@@ -6,3 +6,6 @@ Then it will send an email with a summary of the files compressed.
 The program wil not compress that will not return a favorable compression ratio.
 
 This command line utility behaves like a Daemon tool, so it accepts sigterm signal
+
+This program was also built using pip tools for installing packages and
+activating environment
